@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQLインジェクション体験アプリ</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .container {
+            background: #ffffff;
+            padding: 2.5rem;
+            border-radius: 10px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 550px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            text-align: center;
+            color: #1a1a1a;
+            margin-bottom: 0.5rem;
+        }
+        p.desc {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        button {
+            width: 100%;
+            padding: 0.8rem;
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 1rem;
+        }
+        button:hover {
+            background-color: #004494;
+        }
+        .backend-view {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #282c34;
+            border-radius: 5px;
+        }
+        .backend-view h2 {
+            color: #abb2bf;
+            font-size: 0.9rem;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #4b5263;
+            padding-bottom: 0.3rem;
+        }
+        .query-box {
+            color: #98c379;
+            font-family: 'Courier New', Courier, monospace;
+            word-wrap: break-word;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+        .input-highlight {
+            color: #e06c75;
+            font-weight: bold;
+            background-color: rgba(224, 108, 117, 0.1);
+            padding: 0 2px;
+            border-radius: 3px;
+        }
+        .result {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>システムログイン</h1>
+    <p class="desc">脆弱な文字列連結を行っているログインフォームのシミュレーションです。<br>※正規の管理者情報は ID: <strong>admin</strong> / PASS: <strong>password123</strong></p>
+
+    <div class="form-group">
+        <label for="username">ユーザー名 (username)</label>
+        <input type="text" id="username" placeholder="ユーザー名を入力">
+    </div>
+    <div class="form-group">
+        <label for="password">パスワード (password)</label>
+        <input type="password" id="password" placeholder="パスワードを入力">
+    </div>
+    <button onclick="attemptLogin()">ログイン</button>
+
+    <div id="result" class="result"></div>
+
+    <div class="backend-view">
+        <h2>裏側で組み立てられたSQL文（シミュレーション）</h2>
+        <div id="sql-display" class="query-box">
+            SELECT * FROM users WHERE username = '' AND password = ''
+        </div>
+    </div>
+</div>
+
+<script>
+    function attemptLogin() {
+        // フォームから値を取得
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+
+        // 1. 脆弱なSQL文の組み立て（文字列をそのまま連結している状態を視覚化）
+        const displayHtml = `SELECT * FROM users WHERE username = '<span class="input-highlight">${escapeHtml(user)}</span>' AND password = '<span class="input-highlight">${escapeHtml(pass)}</span>'`;
+        document.getElementById('sql-display').innerHTML = displayHtml;
+
+        // 2. ブラウザ上でのシミュレーション判定処理
+        // ※実際はデータベースエンジンがこの文字列を解釈して実行しますが、
+        // 今回は学習用にJavaScriptで代表的な攻撃パターンの論理を模倣しています。
+
+        // パターンA: ' OR '1'='1 による「常に真(True)」化
+        // 空白を詰めて簡易的に判定しています
+        const isAlwaysTrueUser = user.replace(/\s+/g, '').includes("'OR'1'='1");
+        const isAlwaysTruePass = pass.replace(/\s+/g, '').includes("'OR'1'='1");
+
+        // パターンB: -- による「以降の条件のコメントアウト」
+        // admin' -- のように入力された場合、パスワード判定が無視される
+        const isCommentedOut = user.includes("' --") || user.includes("'#");
+        const baseUser = user.split("'")[0];
+
+        // 判定ロジック
+        if (isAlwaysTrueUser || isAlwaysTruePass) {
+            showResult(true, "【認証突破成功】<br>『 ' OR '1'='1 』が挿入されたことでWHERE句全体がTrueと解釈され、パスワードなしでログインできました！");
+        } else if (isCommentedOut && baseUser === 'admin') {
+            showResult(true, "【認証突破成功】<br>コメントアウト記号（--）により、後ろのパスワード検証部分が無視され、adminとしてログインできました！");
+        } else if (user === 'admin' && pass === 'password123') {
+            showResult(true, "【通常ログイン成功】<br>正しいユーザー名とパスワードです。");
+        } else {
+            showResult(false, "【ログイン失敗】<br>ユーザー名またはパスワードが間違っています。");
+        }
+    }
+
+    function showResult(isSuccess, message) {
+        const resultDiv = document.getElementById('result');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = message;
+        if (isSuccess) {
+            resultDiv.className = 'result success';
+        } else {
+            resultDiv.className = 'result error';
+        }
+    }
+
+    // XSS対策（表示崩れ防止用）
+    function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;');
+    }
+</script>
+
+</body>
+</html>
