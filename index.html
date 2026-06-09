@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQLインジェクション体験アプリ</title>
+    <title>脆弱性体験アプリ (SQLi + XSS)</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
+            background-color: #f4f7f6;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -15,94 +15,95 @@
             margin: 0;
             color: #333;
         }
+        .main-wrapper {
+            display: flex;
+            gap: 2rem;
+            max-width: 1200px;
+            width: 90%;
+        }
         .container {
             background: #ffffff;
-            padding: 2.5rem;
-            border-radius: 10px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 550px;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            flex: 1;
         }
         h1 {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             text-align: center;
             color: #1a1a1a;
-            margin-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 0.5rem;
         }
-        p.desc {
-            text-align: center;
-            font-size: 0.9rem;
-            color: #666;
-            margin-bottom: 2rem;
+        h3.section-title {
+            font-size: 1.1rem;
+            color: #444;
+            margin-top: 0;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .icon {
+            font-size: 1.2rem;
         }
         .form-group {
-            margin-bottom: 1.2rem;
+            margin-bottom: 1rem;
         }
         label {
             display: block;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.4rem;
             font-weight: bold;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            color: #555;
         }
         input[type="text"], input[type="password"] {
             width: 100%;
-            padding: 0.8rem;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            padding: 0.7rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
             box-sizing: border-box;
-            font-size: 1rem;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #007bff;
         }
         button {
             width: 100%;
-            padding: 0.8rem;
-            background-color: #0056b3;
+            padding: 0.75rem;
             color: white;
             border: none;
-            border-radius: 5px;
-            font-size: 1rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
             font-weight: bold;
             cursor: pointer;
             transition: background-color 0.3s;
-            margin-top: 1rem;
+            margin-top: 0.5rem;
         }
-        button:hover {
+        .btn-sqli {
+            background-color: #0056b3;
+        }
+        .btn-sqli:hover {
             background-color: #004494;
         }
-        .backend-view {
-            margin-top: 2rem;
-            padding: 1rem;
-            background-color: #282c34;
-            border-radius: 5px;
+        .btn-xss {
+            background-color: #28a745;
         }
-        .backend-view h2 {
-            color: #abb2bf;
-            font-size: 0.9rem;
-            margin-top: 0;
-            margin-bottom: 0.5rem;
-            border-bottom: 1px solid #4b5263;
-            padding-bottom: 0.3rem;
-        }
-        .query-box {
-            color: #98c379;
-            font-family: 'Courier New', Courier, monospace;
-            word-wrap: break-word;
-            line-height: 1.5;
-            font-size: 0.95rem;
-        }
-        .input-highlight {
-            color: #e06c75;
-            font-weight: bold;
-            background-color: rgba(224, 108, 117, 0.1);
-            padding: 0 2px;
-            border-radius: 3px;
+        .btn-xss:hover {
+            background-color: #218838;
         }
         .result {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            border-radius: 5px;
-            text-align: center;
-            font-weight: bold;
+            margin-top: 1rem;
+            padding: 0.8rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
             display: none;
+        }
+        .result.show {
+            display: block;
         }
         .success {
             background-color: #d4edda;
@@ -114,87 +115,170 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+        .info-box {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #ddd;
+        }
+        .info-box h4 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+        .info-box p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #666;
+            line-height: 1.4;
+        }
+        /* SQLi Specific Styles */
+        .sql-view {
+            margin-top: 1.5rem;
+            padding: 0.8rem;
+            background-color: #282c34;
+            border-radius: 6px;
+        }
+        .sql-title {
+            color: #abb2bf;
+            font-size: 0.8rem;
+            margin-top: 0;
+            margin-bottom: 0.4rem;
+        }
+        .query-box {
+            color: #98c379;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            word-break: break-all;
+        }
+        .sql-input-highlight {
+            color: #e06c75;
+            font-weight: bold;
+        }
+        /* XSS Specific Styles */
+        .welcome-display {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #e2e6ea;
+            border-radius: 8px;
+            min-height: 30px;
+            text-align: center;
+        }
+        #welcome-message {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>システムログイン</h1>
-    <p class="desc">脆弱な文字列連結を行っているログインフォームのシミュレーションです。<br>※正規の管理者情報は ID: <strong>admin</strong> / PASS: <strong>password123</strong></p>
-
-    <div class="form-group">
-        <label for="username">ユーザー名 (username)</label>
-        <input type="text" id="username" placeholder="ユーザー名を入力">
+<div class="main-wrapper">
+    <div class="container" id="sqli-section">
+        <h3><span class="icon">🔍</span>SQLインジェクション体験</h3>
+        <h1>管理者ログイン</h1>
+        <p style="text-align:center; font-size:0.8rem; color:#888; margin-bottom:1rem;">
+            ターゲット: admin / password123
+        </p>
+        <div class="form-group">
+            <label for="sqli-username">ユーザー名 (username)</label>
+            <input type="text" id="sqli-username" placeholder="admin">
+        </div>
+        <div class="form-group">
+            <label for="sqli-password">パスワード (password)</label>
+            <input type="password" id="sqli-password" placeholder="パスワードを入力">
+        </div>
+        <button class="btn-sqli" onclick="attemptSqlLogin()">ログイン</button>
+        <div id="sqli-result" class="result"></div>
+        <div class="sql-view">
+            <div class="sql-title">生成されたSQL（シミュレーション）</div>
+            <div id="sql-display" class="query-box">
+                SELECT * FROM users WHERE username = '' AND password = ''
+            </div>
+        </div>
     </div>
-    <div class="form-group">
-        <label for="password">パスワード (password)</label>
-        <input type="password" id="password" placeholder="パスワードを入力">
-    </div>
-    <button onclick="attemptLogin()">ログイン</button>
 
-    <div id="result" class="result"></div>
-
-    <div class="backend-view">
-        <h2>裏側で組み立てられたSQL文（シミュレーション）</h2>
-        <div id="sql-display" class="query-box">
-            SELECT * FROM users WHERE username = '' AND password = ''
+    <div class="container" id="xss-section">
+        <h3><span class="icon">💀</span>XSS (Cross-Site Scripting) 体験</h3>
+        <h1>プロフィール設定</h1>
+        <p style="text-align:center; font-size:0.8rem; color:#888; margin-bottom:1rem;">
+            ニックネームを入力して保存してください。
+        </p>
+        <div class="form-group">
+            <label for="xss-nickname">新しいニックネーム</label>
+            <input type="text" id="xss-nickname" placeholder="あなたのニックネーム">
+        </div>
+        <button class="btn-xss" onclick="updateNickname()">設定を保存</button>
+        <div id="xss-result" class="result success">設定を保存しました。</div>
+        <div class="welcome-display">
+            <span id="welcome-message">（ここにニックネームが表示されます）</span>
+        </div>
+        <div class="info-box">
+            <h4>💡 解説</h4>
+            <p>このフォームは、入力されたニックネームをエスケープせずにHTMLに埋め込みます。JavaScriptコードを含む文字列を入力すると、ブラウザがそれをスクリプトとして実行してしまいます（格納型XSSの簡易シミュレーション）。</p>
         </div>
     </div>
 </div>
 
 <script>
-    function attemptLogin() {
-        // フォームから値を取得
-        const user = document.getElementById('username').value;
-        const pass = document.getElementById('password').value;
+    // --- SQL Injection Logic ---
+    function attemptSqlLogin() {
+        const user = document.getElementById('sqli-username').value;
+        const pass = document.getElementById('sqli-password').value;
+        const sqlDisplay = document.getElementById('sql-display');
+        const sqliResult = document.getElementById('sqli-result');
 
-        // 1. 脆弱なSQL文の組み立て（文字列をそのまま連結している状態を視覚化）
-        const displayHtml = `SELECT * FROM users WHERE username = '<span class="input-highlight">${escapeHtml(user)}</span>' AND password = '<span class="input-highlight">${escapeHtml(pass)}</span>'`;
-        document.getElementById('sql-display').innerHTML = displayHtml;
+        // 表示用のエスケープ（XSS防止用。SQLiのロジックには影響しません）
+        const escUser = escapeHtml(user);
+        const escPass = escapeHtml(pass);
 
-        // 2. ブラウザ上でのシミュレーション判定処理
-        // ※実際はデータベースエンジンがこの文字列を解釈して実行しますが、
-        // 今回は学習用にJavaScriptで代表的な攻撃パターンの論理を模倣しています。
+        // 1. 脆弱なSQL文の組み立て（文字列連結を視覚化）
+        sqlDisplay.innerHTML = `SELECT * FROM users WHERE username = '<span class="sql-input-highlight">${escUser}</span>' AND password = '<span class="sql-input-highlight">${escPass}</span>'`;
 
-        // パターンA: ' OR '1'='1 による「常に真(True)」化
-        // 空白を詰めて簡易的に判定しています
-        const isAlwaysTrueUser = user.replace(/\s+/g, '').includes("'OR'1'='1");
-        const isAlwaysTruePass = pass.replace(/\s+/g, '').includes("'OR'1'='1");
+        // 2. シミュレーション判定処理（簡易的なロジック模倣）
+        const hasAlwaysTrue = user.includes("' OR '1'='1") || pass.includes("' OR '1'='1");
+        const hasCommentOut = user.includes("' --") && user.startsWith('admin');
 
-        // パターンB: -- による「以降の条件のコメントアウト」
-        // admin' -- のように入力された場合、パスワード判定が無視される
-        const isCommentedOut = user.includes("' --") || user.includes("'#");
-        const baseUser = user.split("'")[0];
-
-        // 判定ロジック
-        if (isAlwaysTrueUser || isAlwaysTruePass) {
-            showResult(true, "【認証突破成功】<br>『 ' OR '1'='1 』が挿入されたことでWHERE句全体がTrueと解釈され、パスワードなしでログインできました！");
-        } else if (isCommentedOut && baseUser === 'admin') {
-            showResult(true, "【認証突破成功】<br>コメントアウト記号（--）により、後ろのパスワード検証部分が無視され、adminとしてログインできました！");
+        sqliResult.className = 'result show';
+        if (hasAlwaysTrue) {
+            sqliResult.innerHTML = "<strong>【認証突破成功】</strong><br>' OR '1'='1 により、WHERE句全体がTrueになり、ログインできました！";
+            sqliResult.classList.add('success');
+        } else if (hasCommentOut) {
+            sqliResult.innerHTML = "<strong>【認証突破成功】</strong><br>コメントアウト（--）によりパスワード検証が無視され、adminとしてログインできました！";
+            sqliResult.classList.add('success');
         } else if (user === 'admin' && pass === 'password123') {
-            showResult(true, "【通常ログイン成功】<br>正しいユーザー名とパスワードです。");
+            sqliResult.innerHTML = "<strong>【通常ログイン成功】</strong><br>正しい資格情報です。";
+            sqliResult.classList.add('success');
         } else {
-            showResult(false, "【ログイン失敗】<br>ユーザー名またはパスワードが間違っています。");
+            sqliResult.innerHTML = "<strong>【ログイン失敗】</strong><br>ユーザー名またはパスワードが間違っています。";
+            sqliResult.classList.add('error');
         }
     }
 
-    function showResult(isSuccess, message) {
-        const resultDiv = document.getElementById('result');
-        resultDiv.style.display = 'block';
-        resultDiv.innerHTML = message;
-        if (isSuccess) {
-            resultDiv.className = 'result success';
-        } else {
-            resultDiv.className = 'result error';
-        }
+    // --- XSS Logic ---
+    function updateNickname() {
+        const nickname = document.getElementById('xss-nickname').value;
+        const welcomeMessage = document.getElementById('welcome-message');
+        const xssResult = document.getElementById('xss-result');
+
+        // ★★★ 脆弱性の核心 ★★★
+        // 入力値をエスケープせずに innerHTML に代入しているため、
+        // 入力されたHTMLタグや<script>がそのまま実行されます。
+        welcomeMessage.innerHTML = nickname; 
+
+        xssResult.classList.add('show');
+        setTimeout(() => xssResult.classList.remove('show'), 2000); // 2秒後にメッセージを隠す
     }
 
-    // XSS対策（表示崩れ防止用）
-//    function escapeHtml(str) {
-  //      return str.replace(/&/g, '&amp;')
-     //             .replace(/</g, '&lt;')
-        //          .replace(/>/g, '&gt;')
-           //       .replace(/"/g, '&quot;');
+    // XSS対策用エスケープ関数（SQLiセクションの表示でのみ使用）
+    function escapeHtml(str) {
+        if (!str) return str;
+        return str.replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;');
     }
 </script>
 
